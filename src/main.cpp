@@ -2,37 +2,62 @@
 #include <Eigen/Dense>
 #include <iostream>
 #include <Windows.h>
+#include <filesystem>
+
+#include "FeatureSet.h"
+#include "FeatureExtractor.h"
+#include "FeatureMatcher.h"
+#include "Visualization.h"
+
+// 简单地多路径读图，避免 VS 的 CMake 的工程目录不确定导致读图失败
+static cv::Mat robustImread(const std::string& filename)
+{
+    std::vector<std::string> candidates =
+    {
+        filename,
+        "../" + filename,
+        "../../" + filename,
+        "../../../" + filename
+    };
+    for (const auto& path : candidates) 
+    {
+        cv::Mat img = cv::imread(path);
+        if (!img.empty()) 
+        {
+            std::cout << "[main] Read successfully: " << path << std::endl;
+            return img;
+        }
+    }
+    return cv::Mat(); // 全部失败，返回空Mat
+}
 
 
 int main()
 {
     SetConsoleCP(CP_UTF8); 
     SetConsoleOutputCP(CP_UTF8);
-    // ---- 验证 OpenCV ----
-    // 先不读外部图片文件，用OpenCV自己创建一张纯色测试图，
-    // 避免这一步同时排查"库链接"和"文件路径"两类问题
-    cv::Mat testImg(480, 640, CV_8UC3, cv::Scalar(0, 128, 255));
-    std::cout << "[OpenCV] 创建图像成功, 尺寸: "
-              << testImg.cols << "x" << testImg.rows
-              << ", 通道数: " << testImg.channels() << std::endl;
-    std::cout << "[OpenCV] 版本号: " << CV_VERSION << std::endl;
+    
+    cv::Mat img1 = robustImread("data/img1.jpg");
+    cv::Mat img2 = robustImread("data/img2.jpg");
 
-    // ---- 验证 Eigen ----
-    Eigen::Matrix3f R;
-    R << 1, 0, 0,
-         0, 1, 0,
-         0, 0, 1;
-    Eigen::Vector3f t(1.0f, 2.0f, 3.0f);
+    if (img1.empty() || img2.empty()) 
+    {
+        std::cerr << "Failed to read images. Please verify that data/img1.jpg and data/img2.jpg exist in the project root directory." << std::endl;
+        return -1;
+    }
+    std::cout << "img1: " << img1.cols << "x" << img1.rows << std::endl;
+    std::cout << "img2: " << img2.cols << "x" << img2.rows << std::endl;
 
-    std::cout << "[Eigen] 单位矩阵 R = \n" << R << std::endl;
-    std::cout << "[Eigen] 向量 t = " << t.transpose() << std::endl;
-    std::cout << "[Eigen] R * t = " << (R * t).transpose() << std::endl;
-    std::cout << "[Eigen] R的行列式 = " << R.determinant() << std::endl;
+    // --------- 特征提取 ---------
+    FeatureSet f1 = extractSIFTFeatures(img1);
+    FeatureSet f2 = extractSIFTFeatures(img2);
 
-    // ---- 弹窗验证 OpenCV 的 highgui 模块（GUI显示）也正常 ----
-    cv::imshow("Environment Check", testImg);
-    std::cout << "\n窗口已弹出，按任意键关闭窗口并结束程序..." << std::endl;
-    cv::waitKey(0);
+    // --------- 特征匹配 + ratio test ---------
+    std::vector<Match> matches = matchBruteForce(f1, f2, 0.75f);
+    std::cout << "vertified " << matches.size() << " pairs keypoints" << std::endl;
+
+    // ---------- 可视化 ----------
+    visualizeMatches(img1, f1, img2, f2, matches, "SIFT Matches");
 
     return 0;
 }

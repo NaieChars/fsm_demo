@@ -10,11 +10,17 @@ set(EIGEN3_INCLUDE_DIR "C:/Dev/eigen-5.0.1")
 
 find_package(OpenCV REQUIRED)
 
-add_executable(sfm_demo src/main.cpp)
+add_executable(sfm_demo
+    src/main.cpp
+    src/FeatureExtractor.cpp
+    src/FeatureMatcher.cpp
+    src/Visualization.cpp
+)
 
 target_include_directories(sfm_demo PRIVATE
     ${OpenCV_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIR}
+    src
 )
 
 target_link_libraries(sfm_demo PRIVATE ${OpenCV_LIBS})
