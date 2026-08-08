@@ -109,14 +109,18 @@ RansacResult ransacEssentialMatrix(const std::vector<Eigen::Vector2f>& pts1,
             if (w > 0.0f && w < 1.0f)
             {
                 // 计算分母（单次采样失败的对数概率）
-                float denom = std::log(1.0f - std::pow(w, sampleSize));
-                if (denom < 0.0f) //denom应小于0
+                double wd = static_cast<double>(w);
+                double denom = std::log(1.0 - std::pow(wd, sampleSize));
+                const double kMinDenomMagnitude = 1e-12;
+                if (denom < -kMinDenomMagnitude) //denom应小于0
                 {
+                    double requiredIters = std::log(1.0 - static_cast<double>(confidence)) / denom;
                     //还需的迭代次数
-                    float requiredIters = std::log(1.0f - confidence) / denom;
-                    int requiredItersInt = static_cast<int>(std::ceil(requiredIters));
-                    if (requiredItersInt < actualIterations)
+                    if (requiredIters < static_cast<double>(actualIterations)) 
+                    {
+                        int requiredItersInt = static_cast<int>(std::ceil(requiredIters));
                         actualIterations = std::max(requiredItersInt, iter + 1);
+                    }
                 }
             }
         }
