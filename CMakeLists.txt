@@ -20,6 +20,9 @@ add_executable(sfm_demo
     src/Correspondences.cpp
     src/EssentialMatrix.cpp
     src/RANSAC.cpp
+    src/PoseRecovery.cpp
+    src/Triangulation.cpp
+    src/PointCloudExport.cpp
 )
 target_include_directories(sfm_demo PRIVATE
     ${OpenCV_INCLUDE_DIRS}
