@@ -3,9 +3,7 @@
 Eigen::Vector3f triangulatePointDLT(const ProjectionMatrix& P1, const ProjectionMatrix& P2,
     const Eigen::Vector2f& x1, const Eigen::Vector2f& x2)
 {
-    // DLT三角化：把"重投影后的点应与观测方向一致"这个约束(叉乘为0)，
-    // 展开成关于齐次3D点坐标X=(X,Y,Z,W)的4个线性方程(每个视角贡献2个独立方程)，
-    // 堆成4x4矩阵A，同样通过SVD求Ax=0的零空间解
+    // DLT三角化
     Eigen::Matrix4f A;
     A.row(0) = x1.x() * P1.row(2) - P1.row(0);
     A.row(1) = x1.y() * P1.row(2) - P1.row(1);

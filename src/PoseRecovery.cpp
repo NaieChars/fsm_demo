@@ -40,9 +40,11 @@ bool recoverPose(const Eigen::Matrix3f& E,
     Eigen::Vector3f& outT)
 {
     Eigen::JacobiSVD<Eigen::Matrix3f> svd(E, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    // SVD 分解后，获取 UV
     Eigen::Matrix3f U = svd.matrixU();
     Eigen::Matrix3f V = svd.matrixV();
 
+    // 修正矩阵方向，保证 det > 0 ,修正第三列等价于 U = -U
     if (U.determinant() < 0.0f) 
     {
         U.col(2) *= -1.0f;
@@ -57,10 +59,12 @@ bool recoverPose(const Eigen::Matrix3f& E,
         1, 0, 0,
         0, 0, 1;
 
+    // 计算 R_1 = UWV^T 和 R_2 = UW^TV^T 两个可能旋转
     Eigen::Matrix3f R1 = U * W * V.transpose();
     Eigen::Matrix3f R2 = U * W.transpose() * V.transpose();
     Eigen::Vector3f t = U.col(2);
 
+    // 生成4种候选
     struct Candidate { Eigen::Matrix3f R; Eigen::Vector3f t; };
     std::vector<Candidate> candidates = 
     {
@@ -71,10 +75,10 @@ bool recoverPose(const Eigen::Matrix3f& E,
     int bestCount = -1;
     int bestIdx = -1;
 
-    for (int i = 0; i < 4; ++i) 
+    for (int i = 0; i < 4; i++)
     {
         int cnt = countPositiveDepth(candidates[i].R, candidates[i].t, pts1, pts2, maxCheck);
-        std::cout << "[PoseRecovery] 候选" << i << " 正深度点数: " << cnt << " / " << maxCheck << std::endl;
+        std::cout << "[PoseRecovery] Candidate" << i << " positive depth points: " << cnt << " / " << maxCheck << std::endl;
         if (cnt > bestCount) 
         {
             bestCount = cnt;
@@ -84,12 +88,12 @@ bool recoverPose(const Eigen::Matrix3f& E,
 
     if (bestIdx < 0) 
     {
-        std::cerr << "[PoseRecovery] 错误: 未能找到任何有效候选" << std::endl;
+        std::cerr << "[PoseRecovery] Error: No valid pose candidate found." << std::endl;
         return false;
     }
     if (bestCount < maxCheck / 2) 
     {
-        std::cerr << "[PoseRecovery] 警告: 最佳候选的正深度点比例不足一半，结果可能不可靠" << std::endl;
+        std::cerr << "[PoseRecovery] Warning: Less than half of the points have positive depth. The recovered pose may be unreliable." << std::endl;
     }
 
     outR = candidates[bestIdx].R;
