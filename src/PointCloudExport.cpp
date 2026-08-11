@@ -7,7 +7,7 @@ bool savePointCloudPLY(const std::vector<ColoredPoint3D>& points, const std::str
     std::ofstream ofs(path);
     if (!ofs.is_open()) 
     {
-        std::cerr << "[PointCloudExport] 无法写入文件: " << path << std::endl;
+        std::cerr << "[PointCloudExport] Failed to open file for writing: " << path << std::endl;
         return false;
     }
 
@@ -29,6 +29,6 @@ bool savePointCloudPLY(const std::vector<ColoredPoint3D>& points, const std::str
     }
 
     ofs.close();
-    std::cout << "[PointCloudExport] Saved into: " << path << " (Totally" << points.size() << "points)" << std::endl;
+    std::cout << "[PointCloudExport] Saved point cloud into: " << path << " (Total " << points.size() << "points)" << std::endl;
     return true;
 }
