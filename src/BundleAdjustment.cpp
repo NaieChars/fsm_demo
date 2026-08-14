@@ -26,7 +26,8 @@ static Eigen::Matrix3f expSO3(const Eigen::Vector3f& w)
     return Eigen::Matrix3f::Identity() + std::sin(theta) * K + (1.0f - std::cos(theta)) * (K * K);
 }
 
-struct ObsJacobian {
+struct ObsJacobian 
+{
     Eigen::Vector2f residual;
     Eigen::Matrix<float, 2, 3> Jp;
     Eigen::Matrix<float, 2, 6> Jc;
