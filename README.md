@@ -1,4 +1,4 @@
-# sfm_demo
+# 多视觉融合三维重建（大二上综设）_ SfM Demo
 
 一个从零手写的增量式 Structure-from-Motion (SfM) 实现：根据一组多视角图像，恢复相机内参、每个视角的位姿，并重建出带颜色的稀疏 3D 点云。**核心几何算法**（8点法、RANSAC、位姿分解、三角化、Bundle Adjustment）均为自行实现，未依赖 g2o / Ceres / COLMAP 等现成 SfM/优化库；OpenCV 仅用于图像 I/O、SIFT 特征提取、相机标定和 PnP 求解这类工程性组件。
 
