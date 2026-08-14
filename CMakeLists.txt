@@ -25,6 +25,7 @@ add_executable(sfm_demo
     src/PointCloudExport.cpp
     src/PnPSolver.cpp
     src/IncrementalSFM.cpp
+    src/BundleAdjustment.cpp
 )
 target_include_directories(sfm_demo PRIVATE
     ${OpenCV_INCLUDE_DIRS}

@@ -4,41 +4,12 @@
 #include <iostream>
 #include <Windows.h>
 #include <filesystem>
+#include <algorithm>
 
-#include "FeatureSet.h"
-#include "FeatureExtractor.h"
-#include "FeatureMatcher.h"
-#include "Visualization.h"
 #include "CameraIntrinsics.h"
-#include "Correspondences.h"
-#include "RANSAC.h"
-#include "PoseRecovery.h"
-#include "Triangulation.h"
-#include "PointCloudExport.h"
-#include "PnPSolver.h"
 #include "IncrementalSFM.h"
-
-// 简单地多路径读图，避免 VS 的 CMake 的工程目录不确定导致读图失败
-static cv::Mat robustImread(const std::string& filename)
-{
-    std::vector<std::string> candidates =
-    {
-        filename,
-        "../" + filename,
-        "../../" + filename,
-        "../../../" + filename
-    };
-    for (const auto& path : candidates) 
-    {
-        cv::Mat img = cv::imread(path);
-        if (!img.empty()) 
-        {
-            std::cout << "[main] Read successfully: " << path << std::endl;
-            return img;
-        }
-    }
-    return cv::Mat(); // 全部失败，返回空Mat
-}
+#include "BundleAdjustment.h"
+#include "PointCloudExport.h"
 
 static bool robustLoadIntrinsics(CameraIntrinsics& intr, const std::string& filename)
 {
@@ -65,18 +36,55 @@ int main()
     SetConsoleOutputCP(CP_UTF8);
 
     CameraIntrinsics intr;
-
-    if (!robustLoadIntrinsics(intr, "camera_intrinsics_blender.txt")) {
-        std::cerr << "Failed to load camera_intrinsics.txt. Please make sure calibrate_tool has been executed and the file has been generated." << std::endl;
+    if (!robustLoadIntrinsics(intr, "camera_intrinsics.txt")) {
+        std::cerr << "无法加载 camera_intrinsics.txt，请确认已运行 calibrate_tool 并生成该文件" << std::endl;
         return -1;
     }
 
     int imagesProcessed = 0;
-    std::vector<ColoredPoint3D> pointCloud = runIncrementalSFM(intr, imagesProcessed);
+    SFMResult sfmResult = runIncrementalSFM(intr, imagesProcessed);
 
-    std::cout << "\n[Main] Successfully registered " << imagesProcessed << " views. Final point cloud size: " << pointCloud.size() << " points." << std::endl;
+    std::cout << "\n[Main] 成功注册 " << imagesProcessed << " 个视角，增量式重建点云总点数: "
+        << sfmResult.pointCloud.size() << std::endl;
 
-    savePointCloudPLY(pointCloud, "sparse_pointcloud.ply");
+    savePointCloudPLY(sfmResult.pointCloud, "sparse_pointcloud_before_ba.ply");
+
+    // ---- Bundle Adjustment 全局优化 ----
+    std::vector<Eigen::Vector3f> points;
+    points.reserve(sfmResult.pointCloud.size());
+    for (const auto& cp : sfmResult.pointCloud) {
+        points.push_back(cp.position);
+    }
+
+    BAResult baResult = runBundleAdjustment(sfmResult.cameras, points, sfmResult.observations, intr.fx);
+
+    std::cout << "\n[Main] BA前平均重投影误差: " << baResult.initialMeanReprojErrorPixels << " 像素" << std::endl;
+    std::cout << "[Main] BA后平均重投影误差: " << baResult.finalMeanReprojErrorPixels << " 像素" << std::endl;
+
+    std::vector<ColoredPoint3D> optimizedPointCloud = sfmResult.pointCloud;
+    for (size_t i = 0; i < optimizedPointCloud.size(); ++i) {
+        optimizedPointCloud[i].position = baResult.points[i];
+    }
+    savePointCloudPLY(optimizedPointCloud, "sparse_pointcloud_after_ba.ply");
+
+    // ---- 过滤残差仍然过大的离群观测，再跑一轮BA做最后精修 ----
+    FilterResult filterResult = filterOutliers(baResult.cameras, baResult.points, sfmResult.observations, intr.fx, 10.0f);
+    std::cout << "\n[Main] 过滤掉 " << filterResult.numObservationsRemoved << " 条离群观测, "
+        << filterResult.numPointsRemoved << " 个点因观测不足被剔除" << std::endl;
+
+    BAResult finalBaResult = runBundleAdjustment(baResult.cameras, baResult.points, filterResult.filteredObservations, intr.fx);
+    std::cout << "[Main] 精修后平均重投影误差: " << finalBaResult.finalMeanReprojErrorPixels << " 像素" << std::endl;
+
+    std::vector<ColoredPoint3D> finalPointCloud;
+    finalPointCloud.reserve(optimizedPointCloud.size());
+    for (size_t i = 0; i < sfmResult.pointCloud.size(); ++i) {
+        if (filterResult.pointKept[i]) {
+            ColoredPoint3D cp = sfmResult.pointCloud[i];
+            cp.position = finalBaResult.points[i];
+            finalPointCloud.push_back(cp);
+        }
+    }
+    savePointCloudPLY(finalPointCloud, "sparse_pointcloud_final.ply");
 
     return 0;
 }
